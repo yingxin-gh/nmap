@@ -912,7 +912,6 @@ void log_vwrite(int logt, const char *fmt, va_list ap) {
   int fileidx = 0;
   int l;
   int logtype;
-  va_list apcopy;
 
   for (logtype = 1; logtype <= LOG_MAX; logtype <<= 1) {
 
@@ -958,7 +957,6 @@ void log_vwrite(int logt, const char *fmt, va_list ap) {
             if (rc != 1) {
               fatal("Failed to write %d bytes of data to (logt==%d) stream. fwrite returned %d.  Quitting.", len, logtype, rc);
             }
-            va_end(apcopy);
           }
           free(writebuf);
         }
