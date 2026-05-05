@@ -792,12 +792,12 @@ static int receive_buf (lua_State *L, int status, lua_KContext ctx)
   else
   {
     lua_pop(L, 2); /* pop 2 results */
-    int oldtop = lua_gettop(L);
     nu->action = "RECEIVE BUF";
     nsock_read(nsp, nu->nsiod, receive_callback, nu->timeout, nu);
     if (nu->action == NU_ACTION_IMMEDIATE) {
-      // Immediate return
-      return lua_gettop(L) - oldtop;
+      // Immediate return. We can't yield since the callback already ran, so we
+      // call ourselves as a continuation just like Lua would have.
+      return receive_buf(L, LUA_YIELD, 0);
     }
     return yield(L, nu, "RECEIVE BUF", FROM, 0, receive_buf);
   }
