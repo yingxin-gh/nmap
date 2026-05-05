@@ -1097,7 +1097,7 @@ static void pcap_receive_handler (nsock_pool nsp, nsock_event nse, void *ud)
   nse_nsock_udata *nu = (nse_nsock_udata *) ud;
   lua_State *L = nu->thread;
 
-  assert(lua_status(L) == LUA_YIELD);
+  assert(nse_type(nse) == NSE_TYPE_PCAP_READ);
   if (nse_status(nse) == NSE_STATUS_SUCCESS)
   {
     const unsigned char *l2_data, *l3_data;
@@ -1111,7 +1111,18 @@ static void pcap_receive_handler (nsock_pool nsp, nsock_event nse, void *ud)
     lua_pushlstring(L, (const char *) l2_data, l2_len);
     lua_pushlstring(L, (const char *) l3_data, l3_len);
     lua_pushnumber(L, TIMEVAL_SECS(tv));
-    nse_restore(L, 5);
+    if(lua_status(L) == LUA_YIELD)
+      nse_restore(L, 5);
+    else
+      nu->action = NU_ACTION_IMMEDIATE;
+    return;
+  }
+  else if (lua_status(L) == LUA_OK) {
+    // Not aware this can happen, but better to be safe
+    lua_pushboolean(L, false);
+    lua_pushstring(L, nse_status2str(nse_status(nse)));
+    nu->action = NU_ACTION_IMMEDIATE;
+    return;
   }
   else
     status(L, nse_status(nse)); /* will also restore the thread */
@@ -1124,8 +1135,13 @@ static int l_pcap_receive (lua_State *L)
   if (nu->nsiod == NULL || nu->af != NSE_AF_PCAP) {
     return luaL_error(L, "not a pcap socket");
   }
+  int oldtop = lua_gettop(L);
   nsock_pcap_read_packet(nsp, nu->nsiod, pcap_receive_handler,
       nu->timeout, nu);
+  if (nu->action == NU_ACTION_IMMEDIATE) {
+    // Immediate return
+    return lua_gettop(L) - oldtop;
+  }
   return yield(L, nu, "PCAP RECEIVE", FROM, 0, NULL);
 }
 
